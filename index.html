@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Virtual PC</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            padding: 20px;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px 20px;
+            background-color: #2c3e50;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        #column-toggle {
+            background-color: #9b59b6;
+        }
+        
+        #column-toggle:hover {
+            background-color: #8e44ad;
+        }
+        
+        #unit-calculation {
+            background-color: #f39c12;
+        }
+        
+        #unit-calculation:hover {
+            background-color: #e67e22;
+        }
+        
+        .data-container {
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            max-height: 70vh;
+            position: relative;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            border: 1px solid #e1e1e1;
+            padding: 10px 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #34495e;
+            color: white;
+            font-weight: 500;
+        }
+        
+        /* Frozen headers and first column */
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        
+        .month-cell {
+            background-color: #ecf0f1;
+            font-weight: bold;
+            color: #2c3e50;
+            white-space: nowrap;
+            position: sticky;
+            left: 0;
+            z-index: 15;
+        }
+        
+        thead .month-cell {
+            z-index: 25;
+            top: 0;
+            left: 0;
+        }
+        
+        tbody .month-cell {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background-color: #ecf0f1;
+        }
+        
+        .input-row td {
+            background-color: #2c3e50;
+            color: white;
+            padding: 8px 12px;
+        }
+        
+        .input-row input {
+            width: 100%;
+            padding: 6px 8px;
+            background-color: #34495e;
+            color: white;
+            border: 1px solid #4a6278;
+            border-radius: 4px;
+        }
+        
+        .input-row input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 25px;
+            width: 85%;
+            max-width: 900px;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e1e1e1;
+        }
+        
+        .modal-header h2 {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #7f8c8d;
+            transition: color 0.2s;
+        }
+        
+        .close:hover {
+            color: #e74c3c;
+        }
+        
+        .column-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .column-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .column-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .column-item input {
+            margin: 0;
+            transform: scale(1.2);
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e1e1e1;
+        }
+        
+        .modal-actions button {
+            padding: 10px 20px;
+        }
+        
+        #select-all {
+            background-color: #2ecc71;
+        }
+        
+        #select-all:hover {
+            background-color: #27ae60;
+        }
+        
+        #deselect-all {
+            background-color: #e74c3c;
+        }
+        
+        #deselect-all:hover {
+            background-color: #c0392b;
+        }
+        
+        #apply-columns {
+            background-color: #3498db;
+        }
+        
+        #apply-columns:hover {
+            background-color: #2980b9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 10px 15px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+        
+        tbody tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tbody tr:hover {
+            background-color: #e8f4fd;
+        }
+        
+        .month-row {
+            font-weight: 500;
+        }
+        
+        .import-export-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .import-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .import-controls label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .import-controls input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        
+        #import-data {
+            background-color: #2ecc71;
+        }
+        
+        #import-data:hover {
+            background-color: #27ae60;
+        }
+        
+        #export-data {
+            background-color: #e74c3c;
+        }
+        
+        #export-data:hover {
+            background-color: #c0392b;
+        }
+        
+        .file-input-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .file-input-container input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: #2ecc71;
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        
+        .notification.error {
+            background-color: #e74c3c;
+        }
+        
+        .highlighted {
+            background-color: #fff3cd !important;
+            transition: background-color 0.5s;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #3498db;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        
+        .consumer-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .consumer-info label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .consumer-info span {
+            font-weight: 600;
+            color: #3498db;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .pagination button {
+            padding: 8px 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .pagination button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .pagination span {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .sub-header {
+            background-color: #2c3e50;
+            color: white;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .nested-header {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .nested-header .main-header {
+            font-weight: 600;
+            padding: 8px;
+        }
+        
+        .nested-header .sub-headers {
+            display: flex;
+            border-top: 1px solid #ddd;
+        }
+        
+        .nested-header .sub-headers div {
+            flex: 1;
+            padding: 6px;
+            text-align: center;
+            border-right: 1px solid #ddd;
+        }
+        
+        .nested-header .sub-headers div:last-child {
+            border-right: none;
+        }
+        
+        /* Wrap text for specific columns */
+        .wrap-text {
+            white-space: normal;
+            word-wrap: break-word;
+            max-width: 120px;
+            min-width: 80px;
+        }
+        
+        /* Specific column widths */
+        .col-pc { width: 60px; }
+        .col-consumer-no { width: 100px; }
+        .col-meter-no { width: 100px; }
+        .col-status { width: 80px; }
+        .col-tariff { width: 80px; }
+        .col-solar { width: 100px; }
+        .col-adj-amount { width: 80px; }
+        .col-net-arrears { width: 90px; }
+        .col-net-bill { width: 90px; }
+        .col-last-receipt { width: 100px; }
+        .col-receipt-amount { width: 100px; }
+        
+        /* Reading columns */
+        .col-import-reading, .col-export-reading, .col-generation-reading { width: 200px; }
+        .sub-col { width: 75px; }
+        
+        /* Unit Calculation Modal Styles */
+        .calculation-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .form-group label {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .form-group select, .form-group input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            background-color: #f8f9fa;
+        }
+        
+        .calculation-result {
+            background-color: #ecf0f1;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .remark {
+            font-size: 12px;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-top: 3px;
+        }
+        
+        .calculation-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e1e1e1;
+        }
+        
+        .calculation-row:last-child {
+            border-bottom: none;
+        }
+        
+        .calculation-label {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .calculation-value {
+            flex: 1;
+            text-align: right;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .calculation-remark {
+            flex: 2;
+            font-size: 12px;
+            color: #7f8c8d;
+            font-style: italic;
+            text-align: left;
+            margin-left: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Solar Virtual PC</h1>
+            <div class="controls">
+                <button id="column-toggle">Toggle Columns</button>
+            </div>
+        </header>
+        
+        <div class="consumer-info">
+            <label>Consumer Name:</label>
+            <span id="consumer-name">-</span>
+        </div>
+        
+        <div class="status-bar">
+            <span id="visible-columns-count">9 columns visible</span>
+            <span id="total-rows-count">12 rows</span>
+            <span id="import-status">Ready to import</span>
+        </div>
+        
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar" id="progress-bar">0%</div>
+        </div>
+        
+        <div class="data-container">
+            <table id="data-table">
+                <thead>
+                    <tr id="table-header">
+                        <!-- Header will be populated by JavaScript -->
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Monthly rows will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="pagination">
+            <button id="prev-page" disabled>Previous</button>
+            <span id="page-info">Page 1 of 3</span>
+            <button id="next-page">Next</button>
+        </div>
+        
+        <div class="import-export-container">
+            <div class="import-controls">
+                <label for="import-value">Consumer Number:</label>
+                <input type="text" id="import-value" placeholder="Enter consumer number">
+                
+                <button id="import-data">Import All Months Data</button>
+            </div>
+            
+            <button id="export-data">Export to Excel</button>
+            <button id="unit-calculation">Unit Calculation</button>
+        </div>
+    </div>
+    
+    <!-- Column Toggle Modal -->
+    <div id="column-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Select Columns to Display</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="column-list" id="column-list">
+                <!-- Column list will be populated by JavaScript -->
+            </div>
+            <div class="modal-actions">
+                <button id="select-all">Select All</button>
+                <button id="deselect-all">Deselect All</button>
+                <button id="apply-columns">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Unit Calculation Modal -->
+    <div id="calculation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Unit Calculation</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="calculation-form">
+                <div class="form-group">
+                    <label for="fiscal-year">Fiscal Year:</label>
+                    <select id="fiscal-year">
+                        <option value="2024-25">2024-25</option>
+                        <option value="2025-26">2025-26</option>
+                        <option value="2026-27">2026-27</option>
+                    </select>
+                </div>
+                
+                <div class="calculation-result">
+                    <div class="calculation-row">
+                        <div class="calculation-label">Total Import Unit:</div>
+                        <div class="calculation-value" id="total-import-unit">0</div>
+                        <div class="calculation-remark">Power usage across MSEDCL grid</div>
+                    </div>
+                    
+                    <div class="calculation-row">
+                        <div class="calculation-label">Total Export Unit:</div>
+                        <div class="calculation-value" id="total-export-unit">0</div>
+                        <div class="calculation-remark"></div>
+                    </div>
+                    
+                    <div class="calculation-row">
+                        <div class="calculation-label">Total Generation Unit:</div>
+                        <div class="calculation-value" id="total-generation-unit">0</div>
+                        <div class="calculation-remark"></div>
+                    </div>
+                    
+                    <div class="calculation-row">
+                        <div class="calculation-label">Self Power Utilization:</div>
+                        <div class="calculation-value" id="self-power-utilization">0</div>
+                        <div class="calculation-remark">Self Generated Power Utilization = { Generation Unit - Export Unit }</div>
+                    </div>
+                    
+                    <div class="calculation-row">
+                        <div class="calculation-label">Banked Solar Units:</div>
+                        <div class="calculation-value" id="banked-solar-units">0</div>
+                        <div class="calculation-remark">Banked Solar Units = { Export Unit - Import Unit }</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Define all columns
+        const allColumns = [
+            "PC",
+            "Consumer No",
+            "Meter No",
+            "Status",
+            "Tariff",
+            "Solar Rooftop Capacity",
+            "Import Reading",
+            "Export Reading",
+            "Generation Reading",
+            "Adj Amount",
+            "Net Arrears",
+            "Net Bill Amount",
+            "Last Receipt Date",
+            "Receipt Amount"
+        ];
+
+        // Define sub-columns for reading types
+        const readingSubColumns = ["MS", "Current", "Previous", "Unit"];
+
+        // Initialize visible columns with only the specified 9 columns
+        let visibleColumns = [
+            "PC",
+            "Consumer No",
+            "Meter No",
+            "Status",
+            "Tariff",
+            "Solar Rooftop Capacity",
+            "Import Reading",
+            "Export Reading",
+            "Generation Reading"
+        ];
+
+        // GitHub Repository URL
+        const GITHUB_REPO_URL = "https://bu0965.github.io/Solar-PC/";
+
+        // Generate months from 202401 to 202603
+        function generateMonths() {
+            const months = [];
+            for (let year = 2024; year <= 2026; year++) {
+                const endMonth = year === 2026 ? 3 : 12;
+                for (let month = 1; month <= endMonth; month++) {
+                    const monthStr = month < 10 ? `0${month}` : `${month}`;
+                    months.push(`${year}${monthStr}`);
+                }
+            }
+            return months;
+        }
+
+        // Pagination variables
+        let currentPage = 1;
+        const rowsPerPage = 12;
+        let allMonths = generateMonths();
+
+        // Store imported data for all months
+        let importedData = {};
+
+        // Fiscal year ranges
+        const fiscalYearRanges = {
+            "2024-25": { start: "202404", end: "202503" },
+            "2025-26": { start: "202504", end: "202603" },
+            "2026-27": { start: "202604", end: "202703" }
+        };
+
+        // Update status bar
+        function updateStatusBar() {
+            document.getElementById('visible-columns-count').textContent = 
+                `${visibleColumns.length} columns visible`;
+            document.getElementById('total-rows-count').textContent = `${allMonths.length} rows`;
+        }
+
+        // Show notification
+        function showNotification(message, isError = false) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = isError ? 'notification error' : 'notification';
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 4000);
+        }
+
+        // Update import status
+        function updateImportStatus(message) {
+            document.getElementById('import-status').textContent = message;
+        }
+
+        // Highlight a row temporarily
+        function highlightRow(row) {
+            row.classList.add('highlighted');
+            setTimeout(() => {
+                row.classList.remove('highlighted');
+            }, 2000);
+        }
+
+        // Update progress bar
+        function updateProgress(percentage, message = '') {
+            const progressBar = document.getElementById('progress-bar');
+            const progressContainer = document.getElementById('progress-container');
+            
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${percentage}%${message ? ' - ' + message : ''}`;
+            
+            if (percentage > 0 && percentage < 100) {
+                progressContainer.style.display = 'block';
+            } else if (percentage === 100) {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 1000);
+            }
+        }
+
+        // Show loading state
+        function setLoadingState(loading) {
+            const importButton = document.getElementById('import-data');
+            const container = document.querySelector('.container');
+            
+            if (loading) {
+                container.classList.add('loading');
+                importButton.disabled = true;
+                importButton.textContent = 'Importing...';
+            } else {
+                container.classList.remove('loading');
+                importButton.disabled = false;
+                importButton.textContent = 'Import All Months Data';
+            }
+        }
+
+        // Get CSS class for column
+        function getColumnClass(column) {
+            const classMap = {
+                "PC": "col-pc",
+                "Consumer No": "col-consumer-no",
+                "Meter No": "col-meter-no",
+                "Status": "col-status",
+                "Tariff": "col-tariff",
+                "Solar Rooftop Capacity": "col-solar wrap-text",
+                "Import Reading": "col-import-reading",
+                "Export Reading": "col-export-reading",
+                "Generation Reading": "col-generation-reading",
+                "Adj Amount": "col-adj-amount wrap-text",
+                "Net Arrears": "col-net-arrears wrap-text",
+                "Net Bill Amount": "col-net-bill wrap-text",
+                "Last Receipt Date": "col-last-receipt wrap-text",
+                "Receipt Amount": "col-receipt-amount wrap-text"
+            };
+            
+            return classMap[column] || "";
+        }
+
+        // Initialize the table
+        function initializeTable() {
+            const tableHeader = document.getElementById('table-header');
+            const tableBody = document.getElementById('table-body');
+            
+            // Clear existing content
+            tableHeader.innerHTML = '';
+            tableBody.innerHTML = '';
+            
+            // Add month header
+            const monthHeader = document.createElement('th');
+            monthHeader.textContent = 'Month';
+            monthHeader.className = 'month-cell';
+            monthHeader.rowSpan = 2;
+            tableHeader.appendChild(monthHeader);
+            
+            // Add columns based on visibility settings
+            visibleColumns.forEach(column => {
+                if (["Import Reading", "Export Reading", "Generation Reading"].includes(column)) {
+                    // Create nested header for reading columns
+                    const th = document.createElement('th');
+                    th.className = `sub-header ${getColumnClass(column)}`;
+                    th.colSpan = 4;
+                    
+                    const nestedHeader = document.createElement('div');
+                    nestedHeader.className = 'nested-header';
+                    
+                    const mainHeader = document.createElement('div');
+                    mainHeader.className = 'main-header';
+                    mainHeader.textContent = column;
+                    
+                    const subHeaders = document.createElement('div');
+                    subHeaders.className = 'sub-headers';
+                    
+                    readingSubColumns.forEach(subCol => {
+                        const subHeader = document.createElement('div');
+                        subHeader.textContent = subCol;
+                        subHeader.className = 'sub-col';
+                        subHeaders.appendChild(subHeader);
+                    });
+                    
+                    nestedHeader.appendChild(mainHeader);
+                    nestedHeader.appendChild(subHeaders);
+                    th.appendChild(nestedHeader);
+                    tableHeader.appendChild(th);
+                } else {
+                    // Regular column header
+                    const th = document.createElement('th');
+                    th.textContent = column;
+                    th.dataset.column = column;
+                    th.rowSpan = 2;
+                    
+                    // Add wrap text class and column width class
+                    th.className = getColumnClass(column);
+                    
+                    tableHeader.appendChild(th);
+                }
+            });
+            
+            // Add sub-header row for reading columns
+            const subHeaderRow = document.createElement('tr');
+            tableHeader.appendChild(subHeaderRow);
+            
+            // Generate monthly rows for current page
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = Math.min(startIndex + rowsPerPage, allMonths.length);
+            const currentMonths = allMonths.slice(startIndex, endIndex);
+            
+            currentMonths.forEach(month => {
+                const row = document.createElement('tr');
+                row.className = 'month-row';
+                row.dataset.month = month;
+                
+                // Add month cell
+                const monthCell = document.createElement('td');
+                monthCell.textContent = month;
+                monthCell.className = 'month-cell';
+                row.appendChild(monthCell);
+                
+                // Add data cells for each column
+                visibleColumns.forEach(column => {
+                    if (["Import Reading", "Export Reading", "Generation Reading"].includes(column)) {
+                        // Add 4 cells for reading columns
+                        for (let i = 0; i < 4; i++) {
+                            const cell = document.createElement('td');
+                            cell.className = 'sub-col';
+                            
+                            // Check if we have imported data for this month
+                            if (importedData[month]) {
+                                const readingType = column.replace(" Reading", "").toLowerCase();
+                                const subColType = readingSubColumns[i].toLowerCase();
+                                const dataKey = `${readingType}_${subColType}`;
+                                
+                                if (importedData[month][dataKey] !== undefined) {
+                                    cell.textContent = importedData[month][dataKey];
+                                }
+                            }
+                            
+                            row.appendChild(cell);
+                        }
+                    } else {
+                        // Regular column cell
+                        const cell = document.createElement('td');
+                        cell.className = getColumnClass(column);
+                        
+                        // Check if we have imported data for this month
+                        if (importedData[month]) {
+                            const dataKey = column.toLowerCase().replace(/ /g, '_');
+                            if (importedData[month][dataKey] !== undefined) {
+                                cell.textContent = importedData[month][dataKey];
+                            }
+                        }
+                        
+                        row.appendChild(cell);
+                    }
+                });
+                
+                tableBody.appendChild(row);
+            });
+            
+            updateStatusBar();
+            updatePaginationInfo();
+        }
+
+        // Calculate units for fiscal year
+        function calculateUnitsForFiscalYear(fiscalYear) {
+            const range = fiscalYearRanges[fiscalYear];
+            if (!range) return { import: 0, export: 0, generation: 0 };
+            
+            let totalImport = 0;
+            let totalExport = 0;
+            let totalGeneration = 0;
+            
+            // Get all months in the fiscal year range
+            const monthsInRange = allMonths.filter(month => 
+                month >= range.start && month <= range.end
+            );
+            
+            // Calculate totals
+            monthsInRange.forEach(month => {
+                if (importedData[month]) {
+                    // Import units
+                    if (importedData[month].import_unit) {
+                        totalImport += parseFloat(importedData[month].import_unit) || 0;
+                    }
+                    
+                    // Export units
+                    if (importedData[month].export_unit) {
+                        totalExport += parseFloat(importedData[month].export_unit) || 0;
+                    }
+                    
+                    // Generation units
+                    if (importedData[month].generation_unit) {
+                        totalGeneration += parseFloat(importedData[month].generation_unit) || 0;
+                    }
+                }
+            });
+            
+            return {
+                import: totalImport,
+                export: totalExport,
+                generation: totalGeneration
+            };
+        }
+
+        // Update calculation modal
+        function updateCalculationModal() {
+            const fiscalYear = document.getElementById('fiscal-year').value;
+            const units = calculateUnitsForFiscalYear(fiscalYear);
+            
+            // Update display values
+            document.getElementById('total-import-unit').textContent = units.import.toFixed(2);
+            document.getElementById('total-export-unit').textContent = units.export.toFixed(2);
+            document.getElementById('total-generation-unit').textContent = units.generation.toFixed(2);
+            
+            // Calculate derived values
+            const selfPowerUtilization = units.generation - units.export;
+            const bankedSolarUnits = units.export - units.import;
+            
+            document.getElementById('self-power-utilization').textContent = selfPowerUtilization.toFixed(2);
+            document.getElementById('banked-solar-units').textContent = bankedSolarUnits.toFixed(2);
+        }
+
+        // Update pagination information
+        function updatePaginationInfo() {
+            const totalPages = Math.ceil(allMonths.length / rowsPerPage);
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            
+            document.getElementById('prev-page').disabled = currentPage === 1;
+            document.getElementById('next-page').disabled = currentPage === totalPages;
+        }
+
+        // Initialize column modal
+        function initializeColumnModal() {
+            const columnList = document.getElementById('column-list');
+            columnList.innerHTML = '';
+            
+            allColumns.forEach(column => {
+                const columnItem = document.createElement('div');
+                columnItem.className = 'column-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `col-${column.replace(/\s+/g, '-')}`;
+                checkbox.checked = visibleColumns.includes(column);
+                checkbox.dataset.column = column;
+                
+                const label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.textContent = column;
+                
+                columnItem.appendChild(checkbox);
+                columnItem.appendChild(label);
+                columnList.appendChild(columnItem);
+            });
+        }
+
+        // Apply column visibility changes
+        function applyColumnVisibility() {
+            const checkboxes = document.querySelectorAll('#column-list input[type="checkbox"]');
+            visibleColumns = [];
+            
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked) {
+                    visibleColumns.push(checkbox.dataset.column);
+                }
+            });
+            
+            // Ensure at least one column is visible
+            if (visibleColumns.length === 0) {
+                visibleColumns = [allColumns[0]];
+            }
+            
+            initializeTable();
+            closeModal();
+        }
+
+        // Export data to Excel
+        function exportToExcel() {
+            try {
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                
+                // Prepare data for export
+                const exportData = [];
+                
+                // Add headers
+                const headers = ['Month'];
+                visibleColumns.forEach(column => {
+                    if (["Import Reading", "Export Reading", "Generation Reading"].includes(column)) {
+                        readingSubColumns.forEach(subCol => {
+                            headers.push(`${column} ${subCol}`);
+                        });
+                    } else {
+                        headers.push(column);
+                    }
+                });
+                exportData.push(headers);
+                
+                // Add data rows for all months
+                allMonths.forEach(month => {
+                    const rowData = [month];
+                    
+                    visibleColumns.forEach(column => {
+                        if (["Import Reading", "Export Reading", "Generation Reading"].includes(column)) {
+                            // Add 4 sub-columns for reading columns
+                            const readingType = column.replace(" Reading", "").toLowerCase();
+                            
+                            readingSubColumns.forEach(subCol => {
+                                const dataKey = `${readingType}_${subCol.toLowerCase()}`;
+                                const value = importedData[month] ? importedData[month][dataKey] || '' : '';
+                                rowData.push(value);
+                            });
+                        } else {
+                            // Regular column
+                            const dataKey = column.toLowerCase().replace(/ /g, '_');
+                            const value = importedData[month] ? importedData[month][dataKey] || '' : '';
+                            rowData.push(value);
+                        }
+                    });
+                    
+                    exportData.push(rowData);
+                });
+                
+                // Create worksheet
+                const ws = XLSX.utils.aoa_to_sheet(exportData);
+                
+                // Add worksheet to workbook
+                XLSX.utils.book_append_sheet(wb, ws, 'Data');
+                
+                // Generate Excel file and trigger download
+                XLSX.writeFile(wb, `customer_data_${document.getElementById('import-value').value || 'export'}.xlsx`);
+                
+                showNotification('Data exported successfully!');
+            } catch (error) {
+                console.error('Export error:', error);
+                showNotification('Error exporting data: ' + error.message, true);
+            }
+        }
+
+        // Fetch file from GitHub repository
+        async function fetchFileFromGitHub(filePath) {
+            try {
+                const fileUrl = `${GITHUB_REPO_URL}/${filePath}`;
+                console.log('Fetching file from:', fileUrl);
+                
+                const response = await fetch(fileUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch file: ${response.status}`);
+                }
+                
+                const arrayBuffer = await response.arrayBuffer();
+                return arrayBuffer;
+            } catch (error) {
+                console.error('Error fetching file from GitHub:', error);
+                throw error;
+            }
+        }
+
+        // Import data from Excel file in GitHub repository
+        async function importAllMonthsDataFromGitHub(customerNumber) {
+            try {
+                setLoadingState(true);
+                updateProgress(0, 'Fetching data file from GitHub...');
+                
+                // Construct filename based on customer number
+                const filename = `data_${customerNumber}.xlsx`;
+                const filePath = filename;
+                
+                updateProgress(20, `Fetching ${filename}`);
+                
+                // Fetch file content
+                const data = await fetchFileFromGitHub(filePath);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                if (jsonData.length <= 1) {
+                    showNotification('No data found in the Excel file', true);
+                    updateImportStatus('No data found');
+                    setLoadingState(false);
+                    return;
+                }
+                
+                updateProgress(50, 'Processing data');
+                
+                const headers = jsonData[0];
+                let foundData = false;
+                
+                // Clear previous imported data
+                importedData = {};
+                
+                // Map column indices from Excel to our data structure
+                const columnMapping = {
+                    "pc": 1, // B column (0-based index)
+                    "consumer_no": 2, // C column
+                    "meter_no": 3, // D column
+                    "status": 4, // E column
+                    "tariff": 5, // F column
+                    "solar_rooftop_capacity": 6, // G column
+                    "import_ms": 7, // H column
+                    "import_current": 8, // I column
+                    "import_previous": 9, // J column
+                    "import_unit": 10, // K column
+                    "export_ms": 11, // L column
+                    "export_current": 12, // M column
+                    "export_previous": 13, // N column
+                    "export_unit": 14, // O column
+                    "generation_ms": 15, // P column
+                    "generation_current": 16, // Q column
+                    "generation_previous": 17, // R column
+                    "generation_unit": 18, // S column
+                    "adj_amount": 19, // T column
+                    "net_arrears": 20, // U column
+                    "net_bill_amount": 21, // V column
+                    "last_receipt_date": 22, // W column
+                    "receipt_amount": 23 // X column
+                };
+                
+                // Process each row in the Excel data
+                for (let i = 1; i < jsonData.length; i++) {
+                    const rowData = jsonData[i];
+                    if (!rowData || rowData.length === 0) continue;
+                    
+                    // Get month from A column (index 0)
+                    const month = rowData[0];
+                    if (!month) continue;
+                    
+                    // Store data for this month
+                    importedData[month] = {};
+                    
+                    // Populate all data fields
+                    Object.keys(columnMapping).forEach(key => {
+                        const colIndex = columnMapping[key];
+                        if (colIndex !== undefined && rowData[colIndex] !== undefined) {
+                            importedData[month][key] = rowData[colIndex];
+                        }
+                    });
+                    
+                    foundData = true;
+                    
+                    // Update progress
+                    const progress = 50 + Math.round((i / (jsonData.length - 1)) * 45);
+                    updateProgress(progress, `Processed ${i}/${jsonData.length - 1} rows`);
+                }
+                
+                setLoadingState(false);
+                updateProgress(100, 'Import complete');
+                
+                if (foundData) {
+                    // Reinitialize table to show imported data
+                    initializeTable();
+                    showNotification(`Data imported for customer ${customerNumber} across all months!`);
+                    updateImportStatus(`Data imported for ${customerNumber}`);
+                } else {
+                    showNotification(`No matching data found for customer ${customerNumber}`, true);
+                    updateImportStatus('No data found');
+                }
+            } catch (error) {
+                console.error('Error importing data from GitHub:', error);
+                showNotification('Error importing data: ' + error.message, true);
+                updateImportStatus('Import failed');
+                setLoadingState(false);
+            }
+        }
+
+        // Modal functions
+        function openColumnModal() {
+            document.getElementById('column-modal').style.display = 'block';
+            initializeColumnModal();
+        }
+
+        function openCalculationModal() {
+            document.getElementById('calculation-modal').style.display = 'block';
+            updateCalculationModal();
+        }
+
+        function closeModal() {
+            document.getElementById('column-modal').style.display = 'none';
+            document.getElementById('calculation-modal').style.display = 'none';
+        }
+
+        // Pagination functions
+        function goToPreviousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                initializeTable();
+            }
+        }
+
+        function goToNextPage() {
+            const totalPages = Math.ceil(allMonths.length / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                initializeTable();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('column-toggle').addEventListener('click', openColumnModal);
+        document.getElementById('unit-calculation').addEventListener('click', openCalculationModal);
+        document.getElementById('apply-columns').addEventListener('click', applyColumnVisibility);
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', closeModal);
+        });
+        
+        document.getElementById('select-all').addEventListener('click', () => {
+            document.querySelectorAll('#column-list input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        });
+        
+        document.getElementById('deselect-all').addEventListener('click', () => {
+            document.querySelectorAll('#column-list input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        });
+
+        document.getElementById('export-data').addEventListener('click', exportToExcel);
+
+        document.getElementById('import-data').addEventListener('click', () => {
+            const customerNumber = document.getElementById('import-value').value.trim();
+            
+            if (!customerNumber) {
+                showNotification('Please enter a customer number', true);
+                return;
+            }
+            
+            importAllMonthsDataFromGitHub(customerNumber);
+        });
+
+        document.getElementById('prev-page').addEventListener('click', goToPreviousPage);
+        document.getElementById('next-page').addEventListener('click', goToNextPage);
+
+        document.getElementById('fiscal-year').addEventListener('change', updateCalculationModal);
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (event) => {
+            const columnModal = document.getElementById('column-modal');
+            const calculationModal = document.getElementById('calculation-modal');
+            if (event.target === columnModal || event.target === calculationModal) {
+                closeModal();
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeTable();
+        });
+    </script>
+</body>
+</html>
